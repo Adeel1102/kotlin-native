@@ -56,25 +56,6 @@ internal class BitcodeCompiler(val context: Context) {
         runTool(absoluteToolName, *arg)
     }
 
-    private fun llvmLto(configurables: LlvmLtoFlags, file: BitcodeFile): ObjectFile {
-        val combined = temporary("combined", ".o")
-        val arguments = mutableListOf<String>().apply {
-            addNonEmpty(configurables.llvmLtoFlags)
-            addNonEmpty(llvmProfilingFlags())
-            when {
-                optimize -> addNonEmpty(configurables.llvmLtoOptFlags)
-                debug -> addNonEmpty(platform.llvmDebugOptFlags)
-                else -> addNonEmpty(configurables.llvmLtoNooptFlags)
-            }
-            addNonEmpty(configurables.llvmLtoDynamicFlags)
-            add(file)
-            // Prevent symbols from being deleted by DCE.
-            addNonEmpty(exportedSymbols.map { "-exported-symbol=${mangleSymbol(target, it)}"} )
-        }
-        hostLlvmTool("llvm-lto", "-o", combined, *arguments.toTypedArray())
-        return combined
-    }
-
     private fun opt(optFlags: OptFlags, bitcodeFile: BitcodeFile): BitcodeFile {
         val flags = (optFlags.optFlags + when {
             optimize -> optFlags.optOptFlags
@@ -127,7 +108,7 @@ internal class BitcodeCompiler(val context: Context) {
         return combinedO
     }
 
-    private fun clang(configurables: AppleConfigurables, file: BitcodeFile): ObjectFile {
+    private fun clang(configurables: ClangFlags, file: BitcodeFile): ObjectFile {
         val objectFile = temporary("result", ".o")
 
         val profilingFlags = llvmProfilingFlags().map { listOf("-mllvm", it) }.flatten()
@@ -165,14 +146,12 @@ internal class BitcodeCompiler(val context: Context) {
 
     fun makeObjectFiles(bitcodeFile: BitcodeFile): List<ObjectFile> =
             listOf(when (val configurables = platform.configurables) {
-                is AppleConfigurables ->
+                is ClangFlags ->
                     clang(configurables, bitcodeFile)
                 is WasmConfigurables ->
                     bitcodeToWasm(configurables, bitcodeFile)
                 is ZephyrConfigurables ->
                     optAndLlc(configurables, bitcodeFile)
-                is LlvmLtoFlags ->
-                    llvmLto(configurables, bitcodeFile)
                 else ->
                     error("Unsupported configurables kind: ${configurables::class.simpleName}!")
             })
