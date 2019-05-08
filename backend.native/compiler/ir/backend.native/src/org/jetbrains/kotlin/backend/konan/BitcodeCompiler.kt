@@ -14,16 +14,8 @@ typealias BitcodeFile = String
 typealias ObjectFile = String
 typealias ExecutableFile = String
 
-private fun mangleSymbol(target: KonanTarget,symbol: String) =
-        if (target.family == Family.IOS || target.family == Family.OSX) {
-            "_$symbol"
-        } else {
-            symbol
-        }
-
 internal class BitcodeCompiler(val context: Context) {
 
-    private val target = context.config.target
     private val platform = context.config.platform
     private val optimize = context.shouldOptimize()
     private val debug = context.config.debug
@@ -31,8 +23,6 @@ internal class BitcodeCompiler(val context: Context) {
     private fun MutableList<String>.addNonEmpty(elements: List<String>) {
         addAll(elements.filter { !it.isEmpty() })
     }
-
-    private val exportedSymbols = context.coverage.addExportedSymbols()
 
     private fun runTool(vararg command: String) =
             Command(*command)
@@ -127,7 +117,11 @@ internal class BitcodeCompiler(val context: Context) {
             }
             addNonEmpty(profilingFlags)
         }
-        targetTool("clang++", *flags.toTypedArray(), file, "-o", objectFile)
+        if (configurables is AppleConfigurables) {
+            targetTool("clang++", *flags.toTypedArray(), file, "-o", objectFile)
+        } else {
+            hostLlvmTool("clang++", *flags.toTypedArray(), file, "-o", objectFile)
+        }
         return objectFile
     }
 
