@@ -246,6 +246,8 @@ void LLVMKotlinInitializeTargets() {
     INIT_LLVM_TARGET(Mips)
     INIT_LLVM_TARGET(X86)
 #elif KONAN_WINDOWS
+    INIT_LLVM_TARGET(ARM)
+    INIT_LLVM_TARGET(X86)
 #endif
 
 #undef INIT_LLVM_TARGET
